@@ -1,0 +1,11 @@
+
+* Need to remove $` and $' from the multipart code, per Jeffrey
+  Friedl's book on regular expressions. Check the book out!
+
+* Interactive debugging
+
+* Add method to create HTML tables from an array
+
+* A "close" method that closes all files that were opened as a result
+  of passing "handle" to the set_file_type method
+
