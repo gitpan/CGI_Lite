@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 
 ##++
-##     CGI Lite v1.8
-##     Last modified: May 10, 1997
+##     CGI Lite v1.9
+##     Last modified: Apr 17, 2000 (BDL - see HISTORY)
 ##
 ##     Copyright (c) 1995, 1996, 1997 by Shishir Gundavaram
 ##     All Rights Reserved
@@ -129,6 +129,19 @@ Returns either a hash or a reference to the hash, which contains
 all of the key/value pairs. For fields that contain file information,
 the value contains either the path to the file, or the filehandle 
 (see the B<set_file_type> method).
+
+=item B<parse_new_form_data>
+
+As for parse_form_data, but clears the CGI object state before processing 
+the request. This is useful in persistant application (e.g. FCGI), where
+the CGI object is reused for multiple requests. e.g.
+
+	$CGI = new CGI_Lite;
+	while (FCGI::accept > 0)
+	{
+		$Query = $CGI->parse_new_form_data();
+		<process query>
+	}
 
 =item B<parse_cookies>
 
@@ -462,7 +475,7 @@ require Exporter;
 ## Global Variables
 ##--
 
-$CGI_Lite::VERSION = '1.8';
+$CGI_Lite::VERSION = '1.9'; # BDL
 
 ##++
 ##  Start
@@ -484,7 +497,8 @@ sub new
 		ordered_keys     =>    [],
 		all_handles      =>    [],
 	        error_status     =>    0,
-	        error_message    =>    undef
+	        error_message    =>    undef,
+		file_size_limit	 =>    2097152,
 	    };
 
     $self->{convert} = { 
@@ -611,6 +625,24 @@ sub set_buffer_size
     return ($self->{buffer_size});
 }
 
+sub parse_new_form_data
+# Reset state before parsing (for persistant CGI objects, e.g. under FastCGI) 
+# BDL
+{
+	my ($self, @param) = @_;
+
+	# close files (should happen anyway when 'all_handles' is cleared...)
+	$self->close_all_files();
+
+	$self->{web_data}	= {};
+	$self->{ordered_keys} 	= [];
+	$self->{all_handles} 	= [];
+	$self->{error_status} 	= 0;
+	$self->{error_message} 	= undef;
+
+	$self->parse_form_data(@param);
+}
+
 sub parse_form_data
 {
     my ($self, $user_request) = @_;
@@ -712,6 +744,13 @@ sub print_data
 	    print "$key = $value$eol";
 	}
     }
+}
+
+sub print_mime_type
+{
+    my ($self, $field) = @_;
+
+    return($self->{'mime_types'}->{$field});
 }
 
 *print_form_data = *print_cookie_data = \&print_data;
@@ -890,6 +929,8 @@ sub _decode_url_encoded_data
     foreach $key_value (@key_value_pairs) {
 	($key, $value) = split (/=/, $key_value, 2);
 
+	$value = '' unless defined $value;	# avoid 'undef' warnings for "key=" BDL Jan/99
+
 	$key   =~ s/%([\da-fA-F]{2})/chr (hex ($1))/eg;
 	$value =~ s/%([\da-fA-F]{2})/chr (hex ($1))/eg;
 	
@@ -1006,6 +1047,8 @@ sub _parse_multipart_data
 		($field) = $disposition =~ /name="([^"]+)"/;
 		++$seen->{$field};
 
+		$self->{'mime_types'}->{$field} = $mime_type;
+
                 if ($seen->{$field} > 1) {
                     $self->{web_data}->{$field} = [$self->{web_data}->{$field}]
                         unless (ref $self->{web_data}->{$field});
@@ -1068,7 +1111,7 @@ sub _store
 	    $$info =~ s/\012/$eol/og      if ($platform ne 'Unix');
 	}
 
-	print $handle $$info;
+    	print $handle $$info;
 
     } elsif ($field) {
 	if ($seen->{$field} > 1) {

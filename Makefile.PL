@@ -1,7 +1,7 @@
 use ExtUtils::MakeMaker;
 require 5.002;
 
-$VERSION = "1.8";
+$VERSION = "1.9";
 
 print "\nWelcome to the installation of CGI_Lite $VERSION...\n\n";
 

@@ -1,3 +1,22 @@
+* v1.9 - 31 Jan, 1999, 17 Apr 2000 BDL
+
+Added parse_new_form_data(), for use under persistant applications 
+(e.g. FCGI, mod_perl). This function simply clears the CGI object's 
+state before calling parse_form_data().
+i.e. rather than creating a new CGI object for each request, you can 
+now write
+  $CGI = new CGI_Lite;
+  while (FCGI::accept > 0)
+  {
+      $Query = $CGI->parse_new_form_data();
+      <process query>
+  }
+
+Minor change in _decode_url_encoded_data() to avoid warnings when 
+no value is provided in the query. 
+
+All changes marked with "BDL". Ben Low <ben@snrc.uow.edu.au>
+
 * v1.8 - May 10, 1997
 
 Removed $` and $' from the code, and "optimized" an important regexp.
