@@ -1,10 +1,10 @@
-#!/usr/local/bin/perl5
+#!/usr/bin/perl
 
 ##++
-##     CGI Lite v1.7
-##     Last modified: December 28, 1996
+##     CGI Lite v1.8
+##     Last modified: May 10, 1997
 ##
-##     Copyright (c) 1995, 1996 by Shishir Gundavaram
+##     Copyright (c) 1995, 1996, 1997 by Shishir Gundavaram
 ##     All Rights Reserved
 ##
 ##     E-Mail: shishir@ora.com
@@ -18,7 +18,7 @@
 
 =head1 NAME
 
-CGI Lite - Perl 5.0 module to process and decode WWW form information.
+CGI_Lite - Perl module to process and decode WWW forms and cookies.
 
 =head1 SYNOPSIS
 
@@ -28,60 +28,100 @@ CGI Lite - Perl 5.0 module to process and decode WWW form information.
 
     $cgi->set_platform ($platform);
     
-        where $platform (case insensitive) can be one of:
+        where $platform can be one of (case insensitive):
         Unix, Windows, Windows95, DOS, NT, PC, Mac or Macintosh
 
-    $cgi->set_file_type ("handle" or "file");
+    $cgi->set_file_type ('handle' or 'file');
+    $cgi->add_timestamp (0, 1 or 2);	
 
-    $size = $cgi->set_buffer_size ($some_size);
+        where 0 = no timestamp
+              1 = timestamp all files (default)
+              2 = timestamp only if file exists
+
+    $cgi->filter_filename (\&subroutine);
+
+    $size = $cgi->set_buffer_size ($some_buffer_size);
 
     $status = $cgi->set_directory ('/some/dir');
     $cgi->set_directory ('/some/dir') || die "Directory doesn't exist.\n";
 
-    $form = $form->parse_form_data;
+    $cgi->close_all_files;
+
+    $cgi->add_mime_type ('application/mac-binhex40');
+    $status = $cgi->remove_mime_type ('application/mac-binhex40');
+    @list = $cgi->get_mime_types;
+
+    $form = $cgi->parse_form_data;
     %form = $cgi->parse_form_data;
 
-    $cookies = $form->parse_cookies;
+    or
+
+    $form = $cgi->parse_form_data ('GET', 'HEAD' or 'POST');
+
+    $cookies = $cgi->parse_cookies;
     %cookies = $cgi->parse_cookies;
 
-    $cgi->print_form_data;
+    $status  = $cgi->is_error;
+    $message = $cgi->get_error_message;
 
-    $cgi->print_cookie_data;
+    $cgi->return_error ('error 1', 'error 2', ...);
 
-    $new_string  = $cgi->wrap_textarea ($string, $length);
+    $keys = $cgi->get_ordered_keys;
+    @keys = $cgi->get_ordered_keys;
 
-    @all_options = $cgi->get_multiple_values ($options);
+    $cgi->print_data;
+
+    $cgi->print_form_data;   (deprecated as of v1.8)
+    $cgi->print_cookie_data; (deprecated as of v1.8)
+
+    $new_string = $cgi->wrap_textarea ($string, $length);
+
+    @all_values = $cgi->get_multiple_values ($reference);
 
     $cgi->create_variables (\%form);
     $cgi->create_variables ($form);
 
+    $escaped_string = browser_escape ($string);
+
+    $encoded_string = url_encode ($string);
+    $decoded_string = url_decode ($string);
+
+    $status = is_dangerous ($string);
+    $safe_string = escape_dangerous_chars ($string);
+
 =head1 DESCRIPTION
 
-You can use this module to decode form information or cookies in a 
-very simple manner; you need not concern yourself with the actual 
-details behind the decoding process. 
-
-This module can handle the traditional GET and POST URL encoded data, 
-as well the new multipart form data (i.e file upload).
+You can use this module to decode form and query information,
+including file uploads, as well as cookies in a very simple 
+manner; you need not concern yourself with the actual details 
+behind the decoding process. 
 
 =head1 METHODS
 
-Here are the methods you can use to process your forms:
+Here are the methods you can use to process your forms and cookies:
 
 =over 4
 
 =item B<parse_form_data>
 
-This will handle all types of requests: GET, HEAD and POST (for both 
-encoding methods). For multipart/form-data, uploaded files are 
-stored in the user selected directory (see B<set_directory>). The 
-files are named in the following format:
+This will handle the following types of requests: GET, HEAD and POST.
+By default, CGI_Lite uses the environment variable REQUEST_METHOD to 
+determine the manner in which the query/form information should be 
+decoded. However, as of v1.8, you are allowed to pass a valid request 
+method to this function to force CGI_Lite to decode the information in 
+a specific manner. 
+
+For multipart/form-data, uploaded files are stored in the user selected 
+directory (see B<set_directory>). If timestamp mode is on (see 
+B<add_timestamp>), the files are named in the following format:
 
     timestamp__filename
 
 where the filename is specified in the "Content-disposition" header.
 I<NOTE:>, the browser URL encodes the name of the file. This module
-makes no effort to decode the information for security reasons.
+makes I<no> effort to decode the information for security reasons.
+However, you can do so by creating a subroutine and then using
+the B<filter_filename> method.
 
 I<Return Value>
 
@@ -92,16 +132,43 @@ the value contains either the path to the file, or the filehandle
 
 =item B<parse_cookies>
 
-Parses any cookies passed by the browser. This method works in
+Decodes and parses cookies passed by the browser. This method works in 
 much the same manner as B<parse_form_data>. 
+
+=item B<is_error>
+
+As of v1.8, errors in parsing are handled differently. You can use this
+method to check for any potential errors after you've called either
+B<parse_form_data> or B<parse_cookies>.
+
+I<Return Value>
+
+    0 Success
+    1 Failure
+
+=item B<get_error_message>
+
+If an error occurs when parsing form/query information or cookies, you
+can use this method to retrieve the error message. Remember, you can
+check for errors by calling the B<is_error> method.
+
+I<Return Value>
+
+The error message.
+
+=item B<return_error>
+
+You can use this method to return errors to the browser and exit. 
 
 =item B<set_platform>
 
-This method will set the end of line characters for uploaded text
-files so that they display properly on the specified platform
-(the platform your HTTP server is running on).
+You can use this method to set the platform on which your Web server
+is running. CGI_Lite uses this information to translate end-of-line 
+(EOL) characters for uploaded files (see the B<add_mime_type> and
+B<remove_mime_type> methods) so that they display properly on that
+platform.
 
-You can specify either:
+You can specify either (case insensitive):
 
     Unix                                  EOL: \012      = \n
     Windows, Windows95, DOS, NT, PC       EOL: \015\012  = \r\n
@@ -123,6 +190,41 @@ I<Return Value>
     0  Failure
     1  Success
 
+=item B<close_all_files>
+
+All uploaded files that are opened as a result of calling B<set_file_type>
+with the "handle" argument can be closed in one shot by calling this
+method.
+
+=item B<add_mime_type>
+
+By default, EOL characters are translated for all uploaded files
+with specific MIME types (i.e text/plain, text/html, etc.). You
+can use this method to add to the list of MIME types. For example,
+if you want CGI_Lite to translate EOL characters for uploaded
+files of I<application/mac-binhex40>, then you would do this:
+
+    $cgi->add_mime_type ('application/mac-binhex40');
+
+=item B<remove_mime_type>
+
+This method is the converse of B<add_mime_type>. It allows you to 
+remove a particular MIME type. For example, if you do not want 
+CGI_Lite to translate EOL characters for uploaded files of I<text/html>, 
+then you would do this:
+
+    $cgi->remove_mime_type ('text/html');
+
+I<Return Value>
+
+    0  Failure
+    1  Success
+
+=item B<get_mime_types>
+
+Returns the list, either as a reference or an actual list, of the 
+MIME types for which EOL translation is performed.
+
 =item B<set_file_type>
 
 The I<names> of uploaded files are returned by default, when you call
@@ -133,13 +235,40 @@ of the handle corresponds to the filename.
 This function should be called I<before> you call B<parse_form_data>, or 
 else it will not work.
 
+=item B<add_timestamp>
+
+By default, a timestamp is added to the front of uploaded files. 
+However, you have the option of completely turning off timestamp mode
+(value 0), or adding a timestamp only for existing files (value 2).
+
+=item B<filter_filename>
+
+You can use this method to change the manner in which uploaded
+files are named. For example, if you want uploaded filenames
+to be all upper case, you can use the following code:
+
+    $cgi->filter_filename (\&make_uppercase);
+    $cgi->parse_form_data;
+
+    .
+    .
+    .
+
+    sub make_uppercase
+    {
+        my $file = shift;
+
+        $file =~ tr/a-z/A-Z/;
+        return $file;
+    }
+
 =item B<set_buffer_size>
 
 This method allows you to set the buffer size when dealing with multipart 
 form data. However, the I<actual> buffer size that the algorithm uses 
-I<will> be 2-3 times that of the value you specify. This ensures that
-boundary strings are not "split" between multiple reads. So, take
-this into consideration when setting a buffer size.
+I<can> be up to 3x the value you specify. This ensures that boundary 
+strings are not "split" between multiple reads. So, take this into 
+consideration when setting the buffer size.
 
 You cannot set a buffer size below 256 bytes and above the total amount 
 of multipart form data. The default value is 1024 bytes. 
@@ -148,15 +277,28 @@ I<Return Value>
 
 The buffer size.
 
+=item B<get_ordered_keys>
+
+Returns either a reference to an array or an array itself consisting
+of the form fields/cookies in the order they were parsed.
+
+I<Return Value>
+
+Ordered keys.
+
+=item B<print_data>
+
+Displays all the key/value pairs (either form data or cookie information)
+in a ordered fashion. The methods B<print_form_data> and B<print_cookie_data>
+are deprecated as of version v1.8, and will be removed in future versions.
+
 =item B<print_form_data>
 
-Displays all of the key/value pairs. If a key contains multiple values,
-all the values are displayed.
+Deprecated as of v1.8, see B<print_data>.
 
-=item B<print_cookie_data>
+=item B<print_cookie_data> (deprecated as of v1.8)
 
-Displays all the cookie key/value pairs. If a key contains multiple 
-values, all the values are displayed.
+Deprecated as of v1.8, see B<print_data>.
 
 =item B<wrap_textarea>
 
@@ -175,9 +317,11 @@ The modified string.
 One of the major changes to this module as of v1.7 is that multiple
 values for a single key are returned as an reference to an array, and 
 I<not> as a string delimited by the null character ("\0"). You can use 
-this function to return the actual array.
+this function to return the actual array. And if you pass a scalar 
+value to this method, it will simply return that value.
 
-There was no way I could make this backward compatible. I apologize!
+There was no way I could make this backward compatible with versions
+older than 1.7. I apologize!
 
 I<Return Value>
 
@@ -200,22 +344,63 @@ If you call this method in the following manner:
 it will create three scalar variables: $name, $sport and $events. 
 Convenient, huh? 
 
+=item B<browser_escape>
+
+Certain characters have special significance to the browser. These
+characters include: "<" and ">". If you want to display these "special"
+characters, you need to escape them using the following notation:
+
+    &#ascii;
+
+This method does just that.
+
+I<Return Value>
+
+Escaped string.
+
+=item B<url_encode>
+
+This method will URL encode a string that you pass it. You can use this
+to encode any data that you wish to pass as a query string to a CGI
+application.
+
+I<Return Value>
+
+URL encoded string.
+
+=item B<url_decode>
+
+You can use this method to URL decode a string. 
+
+I<Return Value>
+
+URL decoded string.
+
+=item B<is_dangerous>
+
+This method checks for the existence of dangerous meta-characters.
+
+I<Return Value>
+
+    0 Safe
+    1 Dangerous
+
+=item B<escape_dangerous_chars>
+
+You can use this method to "escape" any dangerous meta-characters.
+
+I<Return Value>
+
+Escaped string.
+
 =back
 
 =head1 SEE ALSO
 
-You should look at the various other CGI modules, and use the one that 
-best suites you. For more information, you can subscribe to the CGI 
-Module Development List at:
-
-I<CGI-perl@webstorm.com>
-
-Contact: Marc Hedlund I<(hedlund@best.com)> for more information. This 
-list is I<not> for general CGI support. It only deals with CGI module 
-development.
-
-The CGI modules and CGI.pm are maintained by Lincoln Stein 
-I<(lstein@genome.wi.mit.edu)> and can be found on his WWW site:
+If you're looking for more comprehensive CGI modules, you can either 
+use the CGI::* modules or CGI.pm. Both are maintained by Dr. Lincoln
+Stein I<(lstein@genome.wi.mit.edu)> and can be found at your local
+CPAN mirror and at his Web site:
 
 I<http://www-genome.wi.mit.edu/WWW/tools/scripting>
 
@@ -238,6 +423,12 @@ suggestions:
 
 =item Andrew McRae (mcrae@internet.com)
 
+=item Dennis Grant (dg50@chrysler.com)
+
+=item Scott Neufeld (scott.neufeld@mis.ussurg.com)
+
+=item Raul Almquist (imrs@ShadowMAC.org)
+
 =item and many others!
 
 =back
@@ -245,8 +436,8 @@ suggestions:
 =head1 COPYRIGHT INFORMATION
     
 
-        Copyright (c) 1995, 1996 by Shishir Gundavaram
-                      All Rights Reserved
+     Copyright (c) 1995, 1996, 1997 by Shishir Gundavaram
+                     All Rights Reserved
 
  Permission to use, copy, and  distribute  is  hereby granted,
  providing that the above copyright notice and this permission
@@ -258,12 +449,20 @@ suggestions:
 
 package CGI_Lite;
 require 5.002;
+require Exporter;
+
+@ISA    =    (Exporter);
+@EXPORT = qw (browser_escape
+              url_encode
+              url_decode
+              is_dangerous
+              escape_dangerous_chars);
 
 ##++
 ## Global Variables
 ##--
 
-$CGI_Lite::VERSION = "1.7";
+$CGI_Lite::VERSION = '1.8';
 
 ##++
 ##  Start
@@ -279,9 +478,19 @@ sub new
 	        file_type        =>    'name',
 	        platform         =>    'Unix',
 	        buffer_size      =>    1024,
-	        form_data        =>    {},
-                cookie_data      =>    {}
+	        timestamp        =>    1,
+		filter           =>    undef,
+	        web_data         =>    {},
+		ordered_keys     =>    [],
+		all_handles      =>    [],
+	        error_status     =>    0,
+	        error_message    =>    undef
 	    };
+
+    $self->{convert} = { 
+	                   'text/html'    => 1,
+	                   'text/plain'   => 1
+	               };
 
     $self->{file} = { Unix => '/',    Mac => ':',    PC => '\\'       };
     $self->{eol}  = { Unix => "\012", Mac => "\015", PC => "\015\012" };
@@ -310,6 +519,33 @@ sub set_directory
     }
 }
 
+sub add_mime_type
+{
+    my ($self, $mime_type) = @_;
+
+    $self->{convert}->{$mime_type} = 1 if ($mime_type);
+}
+
+sub remove_mime_type
+{
+    my ($self, $mime_type) = @_;
+
+    if ($self->{convert}->{$mime_type}) {
+	delete $self->{convert}->{$mime_type};
+	return (1);
+
+    } else {
+	return (0);
+    }
+}
+
+sub get_mime_types
+{
+    my $self = shift;
+
+    return (sort keys %{ $self->{convert} });
+}
+
 sub set_platform
 {
     my ($self, $platform) = @_;
@@ -333,10 +569,28 @@ sub set_file_type
     my ($self, $type) = @_;
 
     if ($type =~ /^handle$/i) {
-	$self->{file_type} = $type;
+	$self->{file_type} = 'handle';
     } else {
 	$self->{file_type} = 'name';
     }
+}
+
+sub add_timestamp
+{
+    my ($self, $value) = @_;
+
+    if ( ($value < 0) || ($value > 2) ) {
+	$self->{timestamp} = 1;
+    } else {
+	$self->{timestamp} = $value;
+    }
+}
+
+sub filter_filename
+{
+    my ($self, $subroutine) = @_;
+
+    $self->{filter} = $subroutine;
 }
 
 sub set_buffer_size
@@ -359,48 +613,65 @@ sub set_buffer_size
 
 sub parse_form_data
 {
-    my $self = shift;
+    my ($self, $user_request) = @_;
     my ($request_method, $content_length, $content_type, $query_string,
-	$first_line, $boundary, $post_data);
+	$boundary, $post_data, @query_input);
 
-    $request_method = $ENV{REQUEST_METHOD} if ($ENV{REQUEST_METHOD});
-    $content_length = $ENV{CONTENT_LENGTH} if ($ENV{CONTENT_LENGTH});
-    $content_type   = $ENV{CONTENT_TYPE}   if ($ENV{CONTENT_TYPE});
+    $request_method = $user_request || $ENV{REQUEST_METHOD} || '';
+    $content_length = $ENV{CONTENT_LENGTH};
+    $content_type   = $ENV{CONTENT_TYPE};
 
     if ($request_method =~ /^(get|head)$/i) {
 
 	$query_string = $ENV{QUERY_STRING};
-	$self->_decode_url_encoded_data (\$query_string, "form_data");
+	$self->_decode_url_encoded_data (\$query_string, 'form');
 
 	return wantarray ?
-	    %{ $self->{form_data} } : $self->{form_data};
+	    %{ $self->{web_data} } : $self->{web_data};
 
     } elsif ($request_method =~ /^post$/i) {
 
 	if (!$content_type || 
-	    ($content_type eq "application/x-www-form-urlencoded")) {
+	    ($content_type eq 'application/x-www-form-urlencoded')) {
 
 	    local $^W = 0;
 
 	    read (STDIN, $post_data, $content_length);
-	    $self->_decode_url_encoded_data (\$post_data, "form_data");
+	    $self->_decode_url_encoded_data (\$post_data, 'form');
 
 	    return wantarray ? 
-		%{ $self->{form_data} } : $self->{form_data};
+		%{ $self->{web_data} } : $self->{web_data};
 
 	} elsif ($content_type =~ /multipart\/form-data/) {
 	    ($boundary) = $content_type =~ /boundary=(\S+)$/;
 	    $self->_parse_multipart_data ($content_length, $boundary);
 
 	    return wantarray ? 
-		%{ $self->{form_data} } : $self->{form_data};
+		%{ $self->{web_data} } : $self->{web_data};
 
 	} else {
-	    $self->_error ("Invalid content type!");
+	    $self->_error ('Invalid content type!');
 	}
 
     } else {
-	$self->_error ("Invalid request method!");
+
+	##++
+	##  Got the idea of interactive debugging from CGI.pm, though it's
+        ##  handled a bit differently here. Thanks Lincoln!
+	##--
+
+	print "[ Reading query from standard input. Press ^D to stop! ]\n";
+
+	@query_input = <>;
+	chomp (@query_input);
+
+	$query_string = join ('&', @query_input);
+	$query_string =~ s/\\(.)/sprintf ('%%%x', ord ($1))/eg;
+ 
+	$self->_decode_url_encoded_data (\$query_string, 'form');
+
+	return wantarray ?
+	    %{ $self->{web_data} } : $self->{web_data};
     }
 }
 
@@ -411,45 +682,61 @@ sub parse_cookies
 
     $cookies = $ENV{HTTP_COOKIE} || return;
 
-    $self->_decode_url_encoded_data (\$cookies, "cookie_data");
+    $self->_decode_url_encoded_data (\$cookies, 'cookies');
 
     return wantarray ? 
-        %{ $self->{cookie_data} } : $self->{cookie_data};
+        %{ $self->{web_data} } : $self->{web_data};
 }
 
-sub print_form_data
+sub get_ordered_keys
 {
     my $self = shift;
 
-    $self->_print_data ($self->{form_data});
+    return wantarray ?
+	@{ $self->{ordered_keys} } : $self->{ordered_keys};
 }
 
-sub print_cookie_data
+sub print_data
 {
     my $self = shift;
+    my ($key, $value, $eol);
 
-    $self->_print_data ($self->{cookie_data});
+    $eol = $self->{eol}->{$self->{platform}};
+
+    foreach $key (@{ $self->{ordered_keys} }) {
+	$value = $self->{web_data}->{$key};
+
+	if (ref $value) {
+	    print "$key = @$value$eol";
+	} else {
+	    print "$key = $value$eol";
+	}
+    }
 }
+
+*print_form_data = *print_cookie_data = \&print_data;
 
 sub wrap_textarea
 {
     my ($self, $string, $length) = @_;
     my ($new_string, $platform, $eol);
 
-    $length   = 70 unless ($length);
-    $platform = $self->{platform};
-    $eol      = $self->{eol}->{$platform};
+    $length     = 70 unless ($length);
+    $platform   = $self->{platform};
+    $eol        = $self->{eol}->{$platform};
+    $new_string = $string || return;
 	
-    ($new_string = $string) =~ s/(.{0,$length})\s/$1$eol/og;
+    $new_string =~ s/[\0\r]\n?/ /sg;
+    $new_string =~ s/(.{0,$length})\s/$1$eol/sg;
 
-    return ($new_string);
+    return $new_string;
 }
 
 sub get_multiple_values
 {
     my ($self, $array) = @_;
 
-    return (@$array);
+    return (ref $array) ? (@$array) : $array;
 }
 
 sub create_variables
@@ -464,6 +751,89 @@ sub create_variables
     }
 }
 
+sub is_error
+{
+    my $self = shift;
+
+    if ($self->{error_status}) {
+	return (1);
+    } else {
+	return (0);
+    }
+}
+
+sub get_error_message
+{
+    my $self = shift;
+
+    return $self->{error_message} if ($self->{error_message});
+}
+
+sub return_error
+{
+    my ($self, @messages) = @_;
+
+    print "@messages\n";
+
+    exit (1);
+}
+
+##++
+##  Exported Subroutines
+##--
+
+sub browser_escape
+{
+    my $string = shift;
+
+    $string =~ s/([<&"#%>])/sprintf ('&#%d;', ord ($1))/ge;
+
+    return $string;
+}
+
+sub url_encode
+{
+    my $string = shift;
+
+    $string =~ s/([\x00-\x20"#%;<>?{}|\\\\^~`\[\]\x7F-\xFF])/
+                 sprintf ('%%%x', ord ($1))/eg;
+
+    return $string;
+}
+
+##+
+##  Thanks to Paul Phillips for the meta-character list.
+##--
+
+sub url_decode
+{
+    my $string = shift;
+
+    $string =~ s/%([\da-fA-F]{2})/chr (hex ($1))/eg;
+
+    return $string;
+}
+
+sub is_dangerous
+{
+    my $string = shift;
+
+    if ($string =~ /[;<>\*\|`&\$!#\(\)\[\]\{\}:'"]/) {
+        return (1);
+    } else {
+        return (0);
+    }
+}
+
+sub escape_dangerous_chars
+{
+    my $string = shift;
+
+    $string =~ s/([;<>\*\|`&\$!#\(\)\[\]\{\}:'"])/\\$1/g;
+
+    return $string;
+}
+
 ##++
 ##  Internal Methods
 ##--
@@ -472,14 +842,8 @@ sub _error
 {
     my ($self, $message) = @_;
 
-    print STDERR <<End_of_Error;
-
-CGI Lite v$VERSION Error --
-$message
-
-End_of_Error
-
-    exit (1);
+    $self->{error_status}  = 1;
+    $self->{error_message} = $message;
 }
 
 sub _determine_package
@@ -497,29 +861,13 @@ sub _determine_package
     return ($find_package);
 }   
 
-sub _print_data
-{
-    my ($self, $hash) = @_;
-    my ($key, $value, $eol);
-
-    $eol = $self->{eol}->{$self->{platform}};
-
-    while (($key, $value) = each %$hash) {
-	if (ref $value) {
-	    print "$key = @$value$eol";
-	} else {
-	    print "$key = $value$eol";
-	}
-    }
-}
-
 ##++
 ##  Decode URL encoded data
 ##--
 
 sub _decode_url_encoded_data
 {
-    my ($self, $reference_data, $element) = @_;
+    my ($self, $reference_data, $type) = @_;
     my $code;
 
     $code = <<'End_of_URL_Decode';
@@ -530,7 +878,7 @@ sub _decode_url_encoded_data
 
     return unless ($$reference_data);
 
-    if ($element eq 'cookie_data') {
+    if ($type eq 'cookies') {
 	$delimiter = ';\s+';
     } else {
 	$delimiter = '&';
@@ -540,18 +888,19 @@ sub _decode_url_encoded_data
     @key_value_pairs = split (/$delimiter/, $$reference_data);
 		
     foreach $key_value (@key_value_pairs) {
-	($key, $value) = split (/=/, $key_value);
+	($key, $value) = split (/=/, $key_value, 2);
 
 	$key   =~ s/%([\da-fA-F]{2})/chr (hex ($1))/eg;
 	$value =~ s/%([\da-fA-F]{2})/chr (hex ($1))/eg;
 	
-	if ( defined ($self->{$element}->{$key}) ) {
-	    $self->{$element}->{$key} = [$self->{$element}->{$key}] 
-	        unless ( ref $self->{$element}->{$key} );
+	if ( defined ($self->{web_data}->{$key}) ) {
+	    $self->{web_data}->{$key} = [$self->{web_data}->{$key}] 
+	        unless ( ref $self->{web_data}->{$key} );
 
-	    push (@{ $self->{$element}->{$key} }, $value);
+	    push (@{ $self->{web_data}->{$key} }, $value);
 	} else {
-	    $self->{$element}->{$key} = $value;
+	    $self->{web_data}->{$key} = $value;
+	    push (@{ $self->{ordered_keys} }, $key);
 	}
     }
 
@@ -568,16 +917,17 @@ End_of_URL_Decode
 sub _parse_multipart_data
 {
     my ($self, $total_bytes, $boundary) = @_;
-
-    my $code;
+    my ($code, $files);
 
     local $^W = 0;
+    $files    = {};
 
     $code = <<'End_of_Multipart';
 
     my ($seen, $buffer_size, $byte_count, $platform, $eol, $handle, 
-	$bytes_left, $buffer_size, $new_data, $old_data, $current_buffer,
-	$changed, $store, $disposition, $headers, $binary, $field, $file);
+	$directory, $bytes_left, $buffer_size, $new_data, $old_data, 
+	$current_buffer, $changed, $store, $disposition, $headers, 
+        $mime_type, $convert, $field, $file, $new_name, $full_path);
 
     $seen        = {};
     $buffer_size = $self->{buffer_size};
@@ -585,27 +935,30 @@ sub _parse_multipart_data
     $platform    = $self->{platform};
     $eol         = $self->{eol}->{$platform};
     $handle      = 'CL00';
+    $directory   = $self->{multipart_dir} || $self->{default_dir};
 
     while (1) {
-	if ($byte_count < $total_bytes) {
+	if ( ($byte_count < $total_bytes) &&
+	     (length ($current_buffer) < ($buffer_size * 2)) ) {
+
 	    $bytes_left  = $total_bytes - $byte_count;
 	    $buffer_size = $bytes_left if ($bytes_left < $buffer_size);
 
 	    read (STDIN, $new_data, $buffer_size);
-	    $self->_error ("Oh, Oh! I'm upset! Can't read what I want.") 
-	        if (length ($new_data) != $buffer_size);
+            $self->_error ("Oh, Oh! I'm upset! Can't read what I want.")
+		if (length ($new_data) != $buffer_size);
 
 	    $byte_count += $buffer_size;
 
 	    if ($old_data) {
-		$current_buffer = join ("", $old_data, $new_data);
+		$current_buffer = join ('', $old_data, $new_data);
 	    } else {
 		$current_buffer = $new_data;
 	    }
 
 	} elsif ($old_data) {
 	    $current_buffer = $old_data;
-	    undef $old_data;
+	    $old_data = undef;
 
 	} else {
 	    last;
@@ -613,66 +966,83 @@ sub _parse_multipart_data
 
 	$changed = 0;
 
-	if ($current_buffer =~ /(?:\015?\012)?-+$boundary-*[\015\012]*/) {
-	    ($old_data, $store) = ($', $`);
+	##++
+	##  When Netscape Navigator creates a random boundary string, you
+	##  would expect it to pass that _same_ value in the environment
+	##  variable CONTENT_TYPE, but it does not! Instead, it passes a
+	##  value that has the first two characters ("--") missing.
+	##--
 
-            if (($disposition, $headers) = $current_buffer =~ 
+	if ($current_buffer =~ 
+            /(.*?)(?:\015?\012)?-*$boundary-*[\015\012]*(?=(.*))/os) {
+
+	    ($store, $old_data) = ($1, $2);
+
+            if ($current_buffer =~ 
              /[Cc]ontent-[Dd]isposition: ([^\015\012]+)\015?\012  # Disposition
               (?:([A-Za-z].*?)(?:\015?\012){2})?                  # Headers
               (?:\015?\012)?                                      # End
-             /x) {
+              (?=(.*))                                            # Other Data
+             /xs) {
 
-		$self->_store ($platform, $file, $binary, $handle, $eol, 
+		($disposition, $headers, $current_buffer) = ($1, $2, $3);
+		$old_data = $current_buffer;
+
+		($mime_type) = $headers =~ /[Cc]ontent-[Tt]ype: (\S+)/;
+
+		$self->_store ($platform, $file, $convert, $handle, $eol, 
 			       $field, \$store, $seen);
 
 		close ($handle) if (fileno ($handle));
 
-		if (!$headers || ($headers =~ /[Cc]ontent-[Tt]ype: text/)) {
-		    $binary = 0;
+		if ($mime_type && $self->{convert}->{$mime_type}) {
+		    $convert = 1;
 		} else {
-		    $binary = 1;
+		    $convert = 0;
 		}
 
 		$changed = 1;
 
-		$current_buffer = $old_data = $';
-
 		($field) = $disposition =~ /name="([^"]+)"/;
+		++$seen->{$field};
 
-                ++$seen->{$field};
-                $self->{form_data}->{$field} = [$self->{form_data}->{$field}]
-                    if ($seen->{$field} > 1);
+                if ($seen->{$field} > 1) {
+                    $self->{web_data}->{$field} = [$self->{web_data}->{$field}]
+                        unless (ref $self->{web_data}->{$field});
+                } else {
+                    push (@{ $self->{ordered_keys} }, $field);
+                }
 
                 if (($file) = $disposition =~ /filename="(.*)"/) {
-
-	            ##++
-	            ##  Beta versions of Netscape used to send the entire
-	            ##  path to the _local_ file. Unfortunately, there
-	            ##  are people who are still using these versions.
-	            ##--
-
                     $file =~ s|.*[:/\\](.*)|$1|;
 
-                    $file = join ($self->{file}->{$platform}, 
-                                  $self->{multipart_dir} || 
-                                  $self->{default_dir},
-                                  time . "__" . $file);
+                    $new_name = $self->_get_file_name ($platform,
+                                                       $directory, $file);
 
-                    $self->{form_data}->{$field} = $file;
+                    $self->{web_data}->{$field} = $new_name;
 
-                    open (++$handle, ">$file") 
-	                || $self->_error ("Oops! Can't create file $file!");
-                }
+                    $full_path = join ($self->{file}->{$platform}, 
+                                       $directory, $new_name);
+
+                    open (++$handle, ">$full_path") 
+	                || $self->_error ("Can't create file: $full_path!");
+
+                    $files->{$new_name} = $full_path;
+                } 
             }
 
-	} else {
+	} elsif ($old_data) {
             $store    = $old_data;
             $old_data = $new_data;
-        }                
+
+	} else {
+	    $store          = $current_buffer;
+            $current_buffer = $new_data;
+        }
 
         unless ($changed) {
-           $self->_store ($platform, $file, $binary, $handle, $eol, $field, 
-                   \$store, $seen);
+           $self->_store ($platform, $file, $convert, $handle, $eol, 
+                          $field, \$store, $seen);
         }
     }
 
@@ -683,46 +1053,79 @@ End_of_Multipart
     eval ($code);
     $self->_error ($@) if $@;
 
-    $self->_create_handles;
+    $self->_create_handles ($files) if ($self->{file_type} eq 'handle');
 }
 
 sub _store
 {
-    my ($self, $platform, $file, $binary, $handle, $eol, $field, 
+    my ($self, $platform, $file, $convert, $handle, $eol, $field, 
 	$info, $seen) = @_;
 
     if ($file) {
-	unless ($binary) {
-	    $$info =~ s/\015\012/$eol/og  if ($platform ne "PC");
-	    $$info =~ s/\015/$eol/og      if ($platform ne "Mac");
-	    $$info =~ s/\012/$eol/og      if ($platform ne "Unix");
+	if ($convert) {
+	    $$info =~ s/\015\012/$eol/og  if ($platform ne 'PC');
+	    $$info =~ s/\015/$eol/og      if ($platform ne 'Mac');
+	    $$info =~ s/\012/$eol/og      if ($platform ne 'Unix');
 	}
 
 	print $handle $$info;
 
     } elsif ($field) {
 	if ($seen->{$field} > 1) {
-	    $self->{form_data}->{$field}->[$seen->{$field}-1] .= $$info;
+	    $self->{web_data}->{$field}->[$seen->{$field}-1] .= $$info;
 	} else {
-	    $self->{form_data}->{$field} .= $$info;
+	    $self->{web_data}->{$field} .= $$info;
         }
+    }
+}
+
+sub _get_file_name
+{
+    my ($self, $platform, $directory, $file) = @_;
+    my ($filtered_name, $filename, $timestamp, $path);
+
+    $filtered_name = &{ $self->{filter} }($file)
+        if (ref ($self->{filter}) eq 'CODE');
+
+    $filename  = $filtered_name || $file;
+    $timestamp = time . '__' . $filename;
+
+    if (!$self->{timestamp}) {
+	return $filename;
+
+    } elsif ($self->{timestamp} == 1) {
+	return $timestamp;
+	
+    } elsif ($self->{timestamp} == 2) {
+	$path = join ($self->{file}->{$platform}, $directory, $filename);
+	
+	return (-e $path) ? $timestamp : $filename;
     }
 }
 
 sub _create_handles
 {
-    my $self = shift;
-    my ($package, $handle, $key, $value, $handle);
+    my ($self, $files) = @_;
+    my ($package, $handle, $name, $path);
 
     $package = $self->_determine_package;
 
-    while (($key, $value) = each %{ $self->{form_data} }) {
+    while (($name, $path) = each %$files) {
+	$handle = "$package\:\:$name";
+	open ($handle, "<$path")
+            || $self->_error ("Can't read file: $path!");
 
-	if ($value =~ /^\d+__/) {
-	    $handle = "$package\:\:$value";
-	    open ($handle, "<$value")
-	        || $self->_error ("Can't open file $value!");
-	}
+	push (@{ $self->{all_handles} }, $handle);
+    }
+}
+
+sub close_all_files
+{
+    my $self = shift;
+    my $handle;
+
+    foreach $handle (@{ $self->{all_handles} }) {
+	close $handle;
     }
 }
 

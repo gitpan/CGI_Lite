@@ -1,11 +1,6 @@
 
-* Need to remove $` and $' from the multipart code, per Jeffrey
-  Friedl's book on regular expressions. Check the book out!
-
-* Interactive debugging
-
-* Add method to create HTML tables from an array
-
-* A "close" method that closes all files that were opened as a result
-  of passing "handle" to the set_file_type method
+* Saving and re-loading form data
+* Convenient way to output HTTP headers (including cookies)
+* Creating HTML tables from arrays
+* Support for ISINDEX. Does anyone still use this?
 

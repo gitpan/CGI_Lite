@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl5
 
-# example that shows the effect of wrap_textarea and create_variables.
-# let's assume we're getting three fields: name, bio, skills
+# Example that shows the effect of wrap_textarea and create_variables.
+# Let's assume we're getting three fields: name, bio, skills.
 
 use CGI_Lite;
 
@@ -10,13 +10,13 @@ $cgi  = new CGI_Lite;
 
 print "Content-type: text/plain\n\n";
 
-# the create_variables method needs a reference to a hash. we could
+# The create_variables method needs a reference to a hash. We could
 # call this method in the following manner as well:
 #
-# $form = $cgi->parse_form_data;
-# $cgi->create_variables ($form);
-
-# because we have three fields, the create_variables creates three
+#     $form = $cgi->parse_form_data;
+#    $cgi->create_variables ($form);
+#
+# Because we have three fields, the create_variables creates three
 # variables for us: $name, $bio and $skills.
 
 $cgi->create_variables (\%form);

@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl5
 
 # Simple example that performs the same function as the
-# print_form_data method.
+# print_data method.
 
 use CGI_Lite;
 
